@@ -3,12 +3,14 @@
 # Targets bash 3.2 (the version macOS ships). No associative arrays, no mapfile.
 
 MR_TOTAL_MB=0
+MR_FAILED=0          # removals that failed or were refused; clean exits 1 if > 0
 MR_GO=${MR_GO:-0}
+MR_LOG=${MR_LOG:-}   # when set, clean appends one plain-text line per removal here
 
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
-  C_R=$'\033[31m'; C_G=$'\033[32m'; C_Y=$'\033[33m'; C_B=$'\033[1m'; C_0=$'\033[0m'
+  C_R=$'\033[31m'; C_G=$'\033[32m'; C_Y=$'\033[33m'; C_0=$'\033[0m'
 else
-  C_R=''; C_G=''; C_Y=''; C_B=''; C_0=''
+  C_R=''; C_G=''; C_Y=''; C_0=''
 fi
 
 hdr()  { printf "\n%s=========== %s ===========%s\n" "$C_Y" "$1" "$C_0"; }
@@ -47,11 +49,15 @@ mr_guard() {
   esac
 }
 
-# mr_zap PATH [LABEL] — measure, then delete when MR_GO=1
+# mr_log STATUS MB PATH — one uncoloured line in the clean log (no-op without MR_LOG)
+mr_log() { [ -n "$MR_LOG" ] && printf '%-8s %8s MB  %s\n' "$1" "$2" "$3" >> "$MR_LOG"; return 0; }
+
+# mr_zap PATH — measure, then delete when MR_GO=1
 mr_zap() {
   local p="$1" mb
   if ! mr_guard "$p"; then
     err "REFUSED (failed safety check): $p"
+    MR_FAILED=$((MR_FAILED + 1)); mr_log REFUSED - "$p"
     return 1
   fi
   if [ ! -e "$p" ]; then
@@ -63,8 +69,10 @@ mr_zap() {
   if [ "$MR_GO" = "1" ]; then
     if rm -rf "$p" 2>/dev/null; then
       printf "  %s%-10s%s %6s MB  %s\n" "$C_G" "removed" "$C_0" "$mb" "$(tilde "$p")"
+      mr_log removed "$mb" "$p"
     else
       printf "  %s%-10s%s %6s MB  %s  (permission denied?)\n" "$C_R" "FAILED" "$C_0" "$mb" "$(tilde "$p")"
+      MR_FAILED=$((MR_FAILED + 1)); mr_log FAILED "$mb" "$p"
     fi
   else
     printf "  %-10s %6s MB  %s\n" "would rm" "$mb" "$(tilde "$p")"
@@ -134,6 +142,7 @@ mr_banner() {
 mr_total() {
   hdr "TOTAL"
   printf "  %s MB  (~%s GB)\n" "$MR_TOTAL_MB" "$(gb "$MR_TOTAL_MB")"
+  [ -n "$MR_LOG" ] && printf 'total    %8s MB  (~%s GB, upper bound)\n' "$MR_TOTAL_MB" "$(gb "$MR_TOTAL_MB")" >> "$MR_LOG"
   info "This is an upper bound. Hardlinked stores (pnpm especially) report their"
   info "full size, but blocks are only released once every link is gone — so a"
   info "store still referenced by your node_modules frees less than shown."

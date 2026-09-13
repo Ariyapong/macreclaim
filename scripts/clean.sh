@@ -60,10 +60,26 @@ if [ -n "$MR_CONFIG" ]; then
 fi
 
 has_tier() { case ",$MR_TIERS," in *",$1,"*) return 0 ;; esac; return 1; }
+for t in $(printf '%s' "$MR_TIERS" | tr ',' ' '); do
+  case "$t" in a|b|c|d|e) ;; *) err "unknown tier: $t (valid: a,b,c,d,e)"; exit 2 ;; esac
+done
+
+# A live run keeps a plain-text record of every removal next to the scan reports.
+if [ "$MR_GO" = "1" ]; then
+  OUTDIR="${MACRECLAIM_OUT:-$PWD/reports}"
+  mkdir -p "$OUTDIR"
+  MR_LOG="$OUTDIR/clean-$(date +%Y%m%d-%H%M%S).txt"
+  {
+    echo "macreclaim clean --go — $(date)"
+    echo "host=$(hostname)  user=$USER  tiers=$MR_TIERS  config=${MR_CONFIG:-none}"
+    echo
+  } > "$MR_LOG"
+fi
 
 mr_banner
 [ -n "$MR_CONFIG" ] && info "config: $MR_CONFIG" || info "config: none (built-in defaults)"
 info "tiers:  $MR_TIERS"
+[ -n "$MR_LOG" ] && info "log:    $MR_LOG"
 echo
 echo "BEFORE:"; mr_free
 
@@ -155,9 +171,17 @@ if has_tier b; then
     cur=$(node -v 2>/dev/null); [ -n "$cur" ] && keep_add "$cur"
     alias_default=$(cat "$H/.nvm/alias/default" 2>/dev/null)
     if [ -n "$alias_default" ]; then
-      # resolve a bare major like "22" to the highest installed v22.*
-      res=$(ls "$NVD" 2>/dev/null | grep "^v${alias_default#v}" | sed 's/^v//' \
-            | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+      # resolve a bare major like "22" (or "22.1") to the highest installed match
+      # (a helper, not inline: bash 3.2 mis-parses `case` inside `$( )`)
+      nvm_matches() {
+        local a="$1" d n
+        for d in "$NVD"/v"$a"*; do
+          [ -d "$d" ] || continue
+          n=$(basename "$d"); n=${n#v}
+          case "$n" in "$a"|"$a".*) echo "$n" ;; esac
+        done
+      }
+      res=$(nvm_matches "${alias_default#v}" | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
       [ -n "$res" ] && keep_add "v$res"
     fi
     if [ "${#MR_NVM_KEEP[@]}" -gt 0 ]; then
@@ -235,7 +259,7 @@ mr_total
 
 if [ "$MR_GO" = "1" ]; then
   hdr "AFTER"
-  sleep 3
+  sleep "${MR_SLEEP:-3}"
   mr_free
   echo
   if tmutil listlocalsnapshots / 2>/dev/null | grep -q "com.apple.TimeMachine"; then
@@ -250,4 +274,10 @@ if [ "$MR_GO" = "1" ]; then
 else
   echo
   ok "Nothing was deleted. Re-run with --go to execute."
+fi
+
+if [ "$MR_FAILED" -gt 0 ]; then
+  echo
+  err "$MR_FAILED path(s) failed or were refused — see above."
+  exit 1
 fi
