@@ -1,6 +1,10 @@
 # macreclaim
 
-Find and reclaim disk space on macOS. Four small bash scripts, no dependencies, no installer.
+**You delete 40 GB. `df` says you freed nothing.**
+
+That's not your cleanup failing — it's APFS. Blocks still referenced by Time Machine *local snapshots* become **purgeable**, not free, so the space stays invisible until those snapshots are dropped. Most cleanup tools delete and walk away, leaving you to wonder what happened.
+
+macreclaim audits what's actually eating your disk, deletes only what you approve, then **releases what APFS is holding back**. On a real cleanup that last step was the difference between `0 GB` and `44 GB`.
 
 ```bash
 git clone https://github.com/Ariyapong/macreclaim.git
@@ -8,15 +12,11 @@ cd macreclaim
 ./macreclaim scan
 ```
 
+Four bash scripts. No dependencies, no installer, no Homebrew. macOS · bash 3.2 · MIT.
+
 ---
 
-## The thing nobody tells you about APFS
-
-**Deleting files on a Mac often frees no visible space at all.**
-
-Blocks referenced by Time Machine *local snapshots* become **purgeable**, not free. You can delete 800,000 files and watch `df` report the exact same number — or report *less* free space than before, because the snapshots grew to retain everything you just removed.
-
-This is not a bug and it is not your cleanup failing. It is how APFS works.
+## Why your cleanup freed nothing
 
 How to tell your deletion actually worked:
 
@@ -40,7 +40,7 @@ And these two commands will disagree, sometimes by tens of gigabytes:
 ./macreclaim release
 ```
 
-It drops the local snapshots and reports anything still held open by a running process. On a real cleanup this was the difference between **0 GB** and **44 GB** — the deletions had worked perfectly the whole time.
+It drops the local snapshots and reports anything still held open by a running process.
 
 > Local snapshots are macOS's automatic on-disk restore points. Deleting them does **not** touch Time Machine backups on an external or network drive, and macOS recreates them on its own schedule.
 
