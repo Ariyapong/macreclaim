@@ -1,0 +1,19 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    # macOS runner: /bin/bash there is the same 3.2 that ships on every Mac,
+    # and the tests exercise real du/find/git/tmutil-adjacent behaviour.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: |
+          brew install shellcheck
+          shellcheck -s bash -S warning macreclaim lib/common.sh scripts/*.sh tests/run.sh
+      - name: tests (bash 3.2)
+        run: /bin/bash tests/run.sh

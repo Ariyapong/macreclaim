@@ -1,0 +1,4 @@
+# CI runs shellcheck -S warning; style/info findings are noise for this codebase
+# SC2088: "~/Library" in hdr() is a label, not a path
+# SC2329: test helpers are invoked indirectly by the runner
+disable=SC2088,SC2329
