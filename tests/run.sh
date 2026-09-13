@@ -59,6 +59,29 @@ test_guard_refuses_dangerous_paths() {
   done
 }
 
+test_guard_refuses_irreplaceable_user_data() {
+  HOME="$H" . "$ROOT/lib/common.sh"
+  for p in "$H/Library/Mail" "$H/Library/Mail/V10" "$H/Library/Messages" "$H/Library/Messages/chat.db" \
+           "$H/Library/Application Support/MobileSync" "$H/Library/Application Support/MobileSync/Backup/abc" \
+           "$H/Pictures/Photos Library.photoslibrary" "$H/Pictures/Photos Library.photoslibrary/originals" \
+           "$H/Pictures/old.photoslibrary"; do
+    if HOME="$H" mr_guard "$p"; then fail "guard accepted: [$p]"; fi
+  done
+  # neighbours stay deletable: the guard is exact, not a prefix match on "Mail"
+  for p in "$H/Library/Mail Downloads" "$H/Library/Application Support/MobileSyncTool" "$H/Pictures/exports"; do
+    if ! HOME="$H" mr_guard "$p"; then fail "guard refused: [$p]"; fi
+  done
+}
+
+test_config_cannot_target_user_data() {
+  mkfile "$H/Library/Messages/chat.db" 1
+  printf 'MR_APP_PATHS=("$HOME/Library/Messages")\n' > "$T/bad.conf"
+  run_clean --tiers d --go --config "$T/bad.conf"
+  assert_eq 1 "$RC" "exit code"
+  assert_grep "REFUSED" "$OUTLOG"
+  assert_exists "$H/Library/Messages/chat.db"
+}
+
 test_guard_accepts_home_and_applications() {
   HOME="$H" . "$ROOT/lib/common.sh"
   for p in "$H/.npm/_cacache" "$H/Library/Caches/pip" "/Applications/Some Tool.app" "$H/Library/Application Support/X"; do

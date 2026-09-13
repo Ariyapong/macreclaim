@@ -42,6 +42,13 @@ mr_guard() {
     /|"$HOME"|"$HOME"/|/Applications|/Applications/|/Users|/Users/|/Volumes|/Volumes/) return 1 ;;
     /Library|/Library/|/System|/System/*|/bin|/sbin|/usr|/etc|/var|/private|/opt) return 1 ;;
   esac
+  # irreplaceable user data: refused even though it lives under $HOME
+  case "$p" in
+    "$HOME/Library/Mail"|"$HOME/Library/Mail/"*) return 1 ;;
+    "$HOME/Library/Messages"|"$HOME/Library/Messages/"*) return 1 ;;
+    "$HOME/Library/Application Support/MobileSync"|"$HOME/Library/Application Support/MobileSync/"*) return 1 ;;
+    *.photoslibrary|*.photoslibrary/*) return 1 ;;
+  esac
   # must live under $HOME or /Applications
   case "$p" in
     "$HOME"/*|/Applications/*) return 0 ;;
