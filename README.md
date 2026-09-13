@@ -4,6 +4,8 @@
 
 That's not your cleanup failing — it's APFS. Blocks still referenced by Time Machine *local snapshots* become **purgeable**, not free, so the space stays invisible until those snapshots are dropped. Most cleanup tools delete and walk away, leaving you to wonder what happened.
 
+**This only happens when Time Machine is enabled.** On a Mac without it, deletions free space immediately. macreclaim checks which case you're in and tells you, instead of assuming.
+
 macreclaim audits what's actually eating your disk, deletes only what you approve, then **releases what APFS is holding back**. On a real cleanup that last step was the difference between `0 GB` and `44 GB`.
 
 ```bash
@@ -41,6 +43,12 @@ And these two commands will disagree, sometimes by tens of gigabytes:
 ```
 
 It drops the local snapshots and reports anything still held open by a running process.
+
+If there are no snapshots, it says so and exits — nothing to do, and your space was already free.
+
+### Why the total is an upper bound
+
+`du` reports a hardlinked store at full size, but blocks are only released once **every** link is gone. pnpm hardlinks its store into each project's `node_modules`, so deleting a store that your projects still reference frees less than the number shown. On one real run the tool reported 39.3 GB and the disk moved 36 GB — the difference was live pnpm hardlinks. Treat the total as a ceiling, not a promise.
 
 > Local snapshots are macOS's automatic on-disk restore points. Deleting them does **not** touch Time Machine backups on an external or network drive, and macOS recreates them on its own schedule.
 

@@ -239,8 +239,15 @@ if [ "$MR_GO" = "1" ]; then
   sleep 3
   mr_free
   echo
-  warn "df probably shows little or no change. That is expected."
-  warn "Local snapshots still hold the freed blocks. Run:  macreclaim release"
+  if tmutil listlocalsnapshots / 2>/dev/null | grep -q "com.apple.TimeMachine"; then
+    warn "df may show little or no change above — that is expected."
+    warn "Time Machine local snapshots are still holding the freed blocks."
+    warn "Run:  macreclaim release"
+  else
+    ok "No local snapshots on this volume — the space above is already free."
+    info "Time Machine creates those snapshots. Without it, deletions free space"
+    info "immediately and 'macreclaim release' has nothing to do."
+  fi
 else
   echo
   ok "Nothing was deleted. Re-run with --go to execute."

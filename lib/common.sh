@@ -134,4 +134,7 @@ mr_banner() {
 mr_total() {
   hdr "TOTAL"
   printf "  %s MB  (~%s GB)\n" "$MR_TOTAL_MB" "$(gb "$MR_TOTAL_MB")"
+  info "This is an upper bound. Hardlinked stores (pnpm especially) report their"
+  info "full size, but blocks are only released once every link is gone — so a"
+  info "store still referenced by your node_modules frees less than shown."
 }
