@@ -82,12 +82,15 @@ MR_ELECTRON_PARTITIONS=(
 # ---------------------------------------------------------------------------
 # NEVER put these in any list above
 # ---------------------------------------------------------------------------
-#   ~/Library/Mail
-#   ~/Library/Messages
+#   ~/Library/Mail                            (refused by the guard)
+#   ~/Library/Messages                        (refused by the guard)
+#   ~/Pictures/Photos Library.photoslibrary   (refused by the guard)
+#   ~/Library/Application Support/MobileSync  (iOS device backups — refused by the guard)
 #   ~/Library/Group Containers/*Office        (Outlook mail store)
 #   ~/Library/Group Containers/*line*         (LINE chat history)
-#   ~/Pictures/Photos Library.photoslibrary
-#   ~/Library/Application Support/MobileSync  (iOS device backups)
 #   any *.app you actually use
 #
 # These are multi-gigabyte and irreplaceable. They are data, not cache.
+# The first four are refused by the path guard no matter what you list here.
+# Group containers are not, because some are safe to remove for apps you have
+# uninstalled — so check what an entry actually holds before adding it.

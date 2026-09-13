@@ -4,7 +4,7 @@
 
 That's not your cleanup failing — it's APFS. Blocks still referenced by Time Machine *local snapshots* become **purgeable**, not free, so the space stays invisible until those snapshots are dropped. Most cleanup tools delete and walk away, leaving you to wonder what happened.
 
-**This only happens when Time Machine is enabled.** On a Mac without it, deletions free space immediately. macreclaim checks which case you're in and tells you, instead of assuming.
+**This only happens when Time Machine is enabled.** With it off, deletions free space immediately, and your problem is the other one: knowing what is safe to delete in the first place. macreclaim checks which case you're in and tells you, instead of assuming.
 
 macreclaim audits what's actually eating your disk, deletes only what you approve, then **releases what APFS is holding back**. On a real cleanup that last step was the difference between `0 GB` and `44 GB`.
 
@@ -64,6 +64,18 @@ If there are no snapshots, it says so and exits — nothing to do, and your spac
 | `macreclaim release` | Drops local snapshots so the space appears | ~30 s |
 | `macreclaim diff` | What changed between two scan reports | instant |
 
+### Options
+
+```bash
+macreclaim clean --tiers a,b,c --config FILE --go   # default config: ./macreclaim.conf
+macreclaim release --yes                            # skip the "delete snapshots?" prompt
+macreclaim diff --min 500 [OLD NEW]                 # only changes of 500 MB or more
+macreclaim drill ~/some/dir                         # add directories to the drill
+
+MACRECLAIM_OUT=~/scans macreclaim scan              # reports go to ./reports by default
+MR_BIG_FILE_MB=500 MR_NODE_MODULES_MB=250 MR_REPO_MB=1000 macreclaim scan   # scan thresholds
+```
+
 ### Reading the scan report
 
 - While it runs, the terminal shows one timestamped line per section so you can see which part is slow. The report itself only lands when the scan finishes.
@@ -108,16 +120,18 @@ Tier **a** is smart about versioned caches: it keeps the newest playwright brows
 ## Safety
 
 - **Dry run is the default.** Nothing is deleted without `--go`.
-- **Hard rails.** Every path passes a guard that refuses `/`, `$HOME`, `/Applications`, `/Library`, `/System`, `/usr`, `/etc`, `/var`, anything containing `..` or an unexpanded glob, and anything outside `$HOME` or `/Applications`.
+- **Hard rails.** Every path passes a guard that refuses `/`, `$HOME`, `/Applications`, `/Library`, `/System`, `/usr`, `/etc`, `/var`, anything containing `..` or an unexpanded glob, and anything outside `$HOME` or `/Applications`. It also refuses Mail, Messages, iOS device backups and any `.photoslibrary`, even from your own config.
 - **Explicit paths only.** No wildcards into `rm`, no `find -delete`.
-- **`scan`, `drill` and `release` never delete your files.** Only `clean --go` does.
+- **`scan`, `drill`, `diff` and `release` never delete your files.** Only `clean --go` does.
 - Every removal prints its path and size, with a running total.
 - **`clean --go` keeps a record.** Every removed, failed or refused path is appended to `reports/clean-<timestamp>.txt`, so "what did I delete last month" has an answer.
 - **Exit codes mean something.** `clean` exits 1 if any removal failed or was refused by the guard, and 2 on a bad option or unknown tier. Scripts and agents driving it can rely on that.
 
 ### Things this will never touch
 
-Mail stores, Messages, Photos libraries, iOS device backups, and messaging-app group containers (Outlook, LINE, WhatsApp, Signal). These are multi-gigabyte and irreplaceable. They are **data**, not cache. The config template lists them under a "never add these" heading.
+Mail stores, Messages, Photos libraries and iOS device backups are refused by the path guard outright. A typo in your config cannot reach them.
+
+Messaging-app group containers (Outlook, LINE, WhatsApp, Signal) are not guarded, because a group container for an app you have uninstalled is a legitimate Tier d target. They are multi-gigabyte and irreplaceable while the app is in use, so the config template lists them under a "never add these" heading. Check what one holds before you add it.
 
 ### Spotlight's "last opened" date lies
 
@@ -129,13 +143,17 @@ Mail stores, Messages, Photos libraries, iOS device backups, and messaging-app g
 
 `scan`, `drill`, `diff` and `release` are generic — run them any time. Scan again, then `macreclaim diff` to see what grew back.
 
+### Driving it from an AI agent
+
+macreclaim was shaped by being run from an agent session, and several choices exist for that reason: reports are plain text with no colour codes, `clean` is a dry run unless told otherwise, exit codes distinguish "refused" from "done", and every live run leaves a log in `reports/`. A workable loop is: `scan`, read the report, propose config entries with a reason for each, dry-run, get a human yes, `--go`, `release`. The human yes is not optional. The guard catches typos, not bad judgement.
+
 **`macreclaim.conf` is not.** It encodes which repos were cold, which Node versions mattered, and which apps existed *on the day you wrote it*. Re-scan and revise it before each cleanup. Don't run `--go` from a months-old config, and don't copy someone else's.
 
 ---
 
 ## Requirements
 
-macOS. Bash 3.2 (what macOS ships) — no Homebrew bash needed. `sudo` only in `release`, for `tmutil` and for `lsof` (to see files held open by other users' processes). `scan` needs Terminal to have Full Disk Access to size `~/Library/Mail`, Messages and Group Containers; without it those sections come out small and the report says so.
+macOS. Bash 3.2 (what macOS ships) — no Homebrew bash needed. `git` (from the Xcode command line tools) for the git-repos section of `scan` and for Tier c. `sudo` only in `release`, for `tmutil` and for `lsof` (to see files held open by other users' processes). `scan` needs Terminal to have Full Disk Access to size `~/Library/Mail`, Messages and Group Containers; without it those sections come out small and the report says so.
 
 ## Contributing
 
@@ -143,6 +161,7 @@ Issues and PRs welcome. Two rules: dry-run stays the default, and nothing machin
 
 ```bash
 /bin/bash tests/run.sh      # plain-bash test suite, runs against a throwaway fake $HOME
+brew install shellcheck     # the one dev tool; not needed to run macreclaim
 shellcheck -S warning macreclaim lib/common.sh scripts/*.sh tests/run.sh
 ```
 
