@@ -194,21 +194,19 @@ if has_tier c; then
     info "--- auto-discovery: no commit since $cutoff (${MR_STALE_DAYS} days) ---"
     for root in "${MR_NODE_MODULES_ROOTS[@]}"; do
       [ -d "$root" ] || continue
-      find "$root" -maxdepth 4 -type d -name node_modules -prune 2>/dev/null | while read -r nm; do
+      # Process substitution keeps this loop in the main shell, so mr_zap's
+      # guard, total and failure count all apply (bash 3.2 supports it).
+      while read -r nm; do
         repo=$(dirname "$nm")
         [ -d "$repo/.git" ] || continue
         last=$(git -C "$repo" log -1 --format=%cd --date=short 2>/dev/null)
         [ -n "$last" ] || continue
         if [ "$last" \< "$cutoff" ]; then
-          mb=$(size_mb "$nm")
-          printf "  %-10s %6s MB  %s  (last commit %s)\n" \
-            "$([ "$MR_GO" = 1 ] && echo CANDIDATE || echo candidate)" "${mb:-0}" "$(tilde "$nm")" "$last"
-          [ "$MR_GO" = "1" ] && rm -rf "$nm" && printf "      removed\n"
+          info "last commit $last: $(tilde "$repo")"
+          mr_zap "$nm"
         fi
-      done
+      done < <(find "$root" -maxdepth 4 -type d -name node_modules -prune 2>/dev/null)
     done
-    warn "auto-discovered paths are NOT counted in the total below (subshell)."
-    warn "List them explicitly in MR_NODE_MODULES_PATHS for accurate accounting."
   fi
 fi
 
