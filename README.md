@@ -3,7 +3,7 @@
 Find and reclaim disk space on macOS. Four small bash scripts, no dependencies, no installer.
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/macreclaim.git
+git clone https://github.com/Ariyapong/macreclaim.git
 cd macreclaim
 ./macreclaim scan
 ```
