@@ -149,7 +149,9 @@ if has_tier b; then
     alias_default=$(cat "$H/.nvm/alias/default" 2>/dev/null)
     if [ -n "$alias_default" ]; then
       # resolve a bare major like "22" to the highest installed v22.*
-      res=$(ls "$NVD" 2>/dev/null | grep "^v${alias_default#v}" | sort -V | tail -1)
+      res=$(ls "$NVD" 2>/dev/null | grep "^v${alias_default#v}" | sed 's/^v//' \
+            | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+      [ -n "$res" ] && res="v$res"
       [ -n "$res" ] && KEEP="$KEEP $res"
     fi
     if [ "${#MR_NVM_KEEP[@]}" -gt 0 ]; then

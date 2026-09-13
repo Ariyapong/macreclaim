@@ -66,20 +66,25 @@ mr_zap() {
   fi
 }
 
-# mr_keep_newest DIR PREFIX — remove DIR/PREFIX-<n> except the highest <n>
+# mr_keep_newest DIR PREFIX — keep only the highest-numbered DIR/PREFIX<n>
+# Handles both "chromium-1243" (hyphenated) and "v11" (bare) naming.
 mr_keep_newest() {
-  local dir="$1" prefix="$2" newest="" n best=-1 d
+  local dir="$1" prefix="$2" newest="" n best=-1 d base
   [ -d "$dir" ] || return 0
-  for d in "$dir/$prefix"-*; do
+  for d in "$dir/$prefix"*; do
     [ -d "$d" ] || continue
-    n=$(basename "$d"); n=${n##*-}
+    base=$(basename "$d")
+    n=${base#"$prefix"}
+    n=${n#-}
     case "$n" in ''|*[!0-9]*) continue ;; esac
     if [ "$n" -gt "$best" ]; then best=$n; newest="$d"; fi
   done
   [ "$best" -ge 0 ] || return 0
-  for d in "$dir/$prefix"-*; do
+  for d in "$dir/$prefix"*; do
     [ -d "$d" ] || continue
     [ "$d" = "$newest" ] && continue
+    base=$(basename "$d"); n=${base#"$prefix"}; n=${n#-}
+    case "$n" in ''|*[!0-9]*) continue ;; esac
     mr_zap "$d"
   done
   info "keeping $(basename "$newest")"
@@ -87,7 +92,7 @@ mr_keep_newest() {
 
 mr_quit_app() {
   local a="$1"
-  pgrep -qx "$a" 2>/dev/null || pgrep -qf "/$a.app/" 2>/dev/null || return 0
+  pgrep -x "$a" >/dev/null 2>&1 || pgrep -f "/$a.app/" >/dev/null 2>&1 || return 0
   if [ "$MR_GO" = "1" ]; then
     info "quitting $a"
     osascript -e "tell application \"$a\" to quit" >/dev/null 2>&1
