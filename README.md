@@ -14,7 +14,7 @@ cd macreclaim
 ./macreclaim scan
 ```
 
-Four bash scripts. No dependencies, no installer, no Homebrew. macOS · bash 3.2 · MIT.
+Five bash scripts. No dependencies, no installer, no Homebrew. macOS · bash 3.2 · MIT.
 
 ---
 
@@ -62,12 +62,14 @@ If there are no snapshots, it says so and exits — nothing to do, and your spac
 | `macreclaim drill` | Expands the biggest directories found by the scan | ~1 min |
 | `macreclaim clean` | Tiered cleanup — **dry run unless `--go`** | ~1 min |
 | `macreclaim release` | Drops local snapshots so the space appears | ~30 s |
+| `macreclaim diff` | What changed between two scan reports | instant |
 
 ### Reading the scan report
 
+- While it runs, the terminal shows one timestamped line per section so you can see which part is slow. The report itself only lands when the scan finishes.
 - Sizes are **allocated blocks**, not nominal size. A sparse disk image such as Docker's `Docker.raw` or a VM's `rootfs.img` shows what it really occupies (22 GB, say), not the 60 GB it claims in Finder.
 - If a section ends with `(find reported N unreadable entries; first: …)`, part of your home folder was skipped. The usual cause is Terminal without **Full Disk Access** (System Settings → Privacy & Security); grant it and re-run. Without that line, the walk was complete.
-- Reports are plain text with no colour codes, so they diff cleanly between runs.
+- Reports are plain text with no colour codes, so they diff cleanly between runs. `macreclaim diff` does that for you: it compares the two newest reports (or any two you name) and lists what grew, shrank, appeared or vanished, sorted by size. Changes inside the rounding of `du -h` are suppressed, so `130G` becoming `129G` is not reported as a 1 GB change.
 
 ### Typical run
 
@@ -81,6 +83,8 @@ $EDITOR macreclaim.conf              # fill in YOUR machine's paths
 ./macreclaim clean --tiers a,b       # preview — deletes nothing
 ./macreclaim clean --tiers a,b --go  # execute
 ./macreclaim release                 # make the space visible
+
+./macreclaim scan && ./macreclaim diff   # later: what changed since last time?
 ```
 
 ---
@@ -108,6 +112,8 @@ Tier **a** is smart about versioned caches: it keeps the newest playwright brows
 - **Explicit paths only.** No wildcards into `rm`, no `find -delete`.
 - **`scan`, `drill` and `release` never delete your files.** Only `clean --go` does.
 - Every removal prints its path and size, with a running total.
+- **`clean --go` keeps a record.** Every removed, failed or refused path is appended to `reports/clean-<timestamp>.txt`, so "what did I delete last month" has an answer.
+- **Exit codes mean something.** `clean` exits 1 if any removal failed or was refused by the guard, and 2 on a bad option or unknown tier. Scripts and agents driving it can rely on that.
 
 ### Things this will never touch
 
@@ -121,7 +127,7 @@ Mail stores, Messages, Photos libraries, iOS device backups, and messaging-app g
 
 ## Re-running it later
 
-`scan`, `drill` and `release` are generic — run them any time.
+`scan`, `drill`, `diff` and `release` are generic — run them any time. Scan again, then `macreclaim diff` to see what grew back.
 
 **`macreclaim.conf` is not.** It encodes which repos were cold, which Node versions mattered, and which apps existed *on the day you wrote it*. Re-scan and revise it before each cleanup. Don't run `--go` from a months-old config, and don't copy someone else's.
 
@@ -134,6 +140,13 @@ macOS. Bash 3.2 (what macOS ships) — no Homebrew bash needed. `sudo` only in `
 ## Contributing
 
 Issues and PRs welcome. Two rules: dry-run stays the default, and nothing machine-specific goes in the committed config.
+
+```bash
+/bin/bash tests/run.sh      # plain-bash test suite, runs against a throwaway fake $HOME
+shellcheck -S warning macreclaim lib/common.sh scripts/*.sh tests/run.sh
+```
+
+CI runs both on a macOS runner, under the bash 3.2 that ships with macOS. The tests cover the path guard, dry-run versus `--go`, every tier's keep/remove logic, exit codes and `diff`.
 
 ## License
 
