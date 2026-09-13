@@ -42,13 +42,13 @@ And these two commands will disagree, sometimes by tens of gigabytes:
 ./macreclaim release
 ```
 
-It drops the local snapshots and reports anything still held open by a running process.
+It drops the local snapshots and reports anything still held open by a running process — one line per file, with `(xN)` when several processes or descriptors hold the same one.
 
 If there are no snapshots, it says so and exits — nothing to do, and your space was already free.
 
 ### Why the total is an upper bound
 
-`du` reports a hardlinked store at full size, but blocks are only released once **every** link is gone. pnpm hardlinks its store into each project's `node_modules`, so deleting a store that your projects still reference frees less than the number shown. On one real run the tool reported 39.3 GB and the disk moved 36 GB — the difference was live pnpm hardlinks. Treat the total as a ceiling, not a promise.
+`du` reports a hardlinked store at full size, but blocks are only released once **every** link is gone. pnpm hardlinks its store into each project's `node_modules` (uv does the same from `~/.cache/uv` into virtualenvs), so deleting a store that your projects still reference frees less than the number shown. On one real run the tool reported 39.3 GB and the disk moved 36 GB — the difference was live pnpm hardlinks. Treat the total as a ceiling, not a promise.
 
 > Local snapshots are macOS's automatic on-disk restore points. Deleting them does **not** touch Time Machine backups on an external or network drive, and macOS recreates them on its own schedule.
 
@@ -62,6 +62,12 @@ If there are no snapshots, it says so and exits — nothing to do, and your spac
 | `macreclaim drill` | Expands the biggest directories found by the scan | ~1 min |
 | `macreclaim clean` | Tiered cleanup — **dry run unless `--go`** | ~1 min |
 | `macreclaim release` | Drops local snapshots so the space appears | ~30 s |
+
+### Reading the scan report
+
+- Sizes are **allocated blocks**, not nominal size. A sparse disk image such as Docker's `Docker.raw` or a VM's `rootfs.img` shows what it really occupies (22 GB, say), not the 60 GB it claims in Finder.
+- If a section ends with `(find reported N unreadable entries; first: …)`, part of your home folder was skipped. The usual cause is Terminal without **Full Disk Access** (System Settings → Privacy & Security); grant it and re-run. Without that line, the walk was complete.
+- Reports are plain text with no colour codes, so they diff cleanly between runs.
 
 ### Typical run
 
@@ -83,7 +89,7 @@ $EDITOR macreclaim.conf              # fill in YOUR machine's paths
 
 | Tier | Contents | Config needed |
 |---|---|---|
-| **a** | Regenerable caches — npm, pnpm, puppeteer, playwright, pip, yarn, editor caches, Homebrew | No |
+| **a** | Regenerable caches — npm, pnpm, uv, puppeteer, playwright, pip, yarn, editor caches, Homebrew | No |
 | **b** | Rebuildable — NuGet, SonarLint, Gradle, Maven, DerivedData, CocoaPods, old Node versions | No |
 | **c** | `node_modules` in stale repos | Yes |
 | **d** | Apps and their leftovers | **Yes — empty by default** |
@@ -123,7 +129,7 @@ Mail stores, Messages, Photos libraries, iOS device backups, and messaging-app g
 
 ## Requirements
 
-macOS. Bash 3.2 (what macOS ships) — no Homebrew bash needed. `sudo` only for `release`, only for `tmutil`.
+macOS. Bash 3.2 (what macOS ships) — no Homebrew bash needed. `sudo` only in `release`, for `tmutil` and for `lsof` (to see files held open by other users' processes). `scan` needs Terminal to have Full Disk Access to size `~/Library/Mail`, Messages and Group Containers; without it those sections come out small and the report says so.
 
 ## Contributing
 
