@@ -120,8 +120,13 @@ if has_tier a; then
 
   info "--- homebrew ---"
   if command -v brew >/dev/null 2>&1; then
-    if [ "$MR_GO" = "1" ]; then brew cleanup -s 2>/dev/null | tail -3
-    else brew cleanup -n 2>/dev/null | tail -1; fi
+    if [ "$MR_GO" = "1" ]; then
+      bout=$(brew cleanup -s 2>/dev/null | tail -3)
+    else
+      bout=$(brew cleanup -n 2>/dev/null | tail -1)
+    fi
+    if [ -n "$bout" ]; then echo "$bout" | sed 's/^/  /'
+    else info "nothing for brew to clean"; fi
   else
     info "brew not installed, skipping"
   fi
@@ -145,17 +150,17 @@ if has_tier b; then
   NVD="$H/.nvm/versions/node"
   if [ -d "$NVD" ]; then
     KEEP=""
-    cur=$(node -v 2>/dev/null); [ -n "$cur" ] && KEEP="$KEEP $cur"
+    keep_add() { case " $KEEP " in *" $1 "*) return ;; esac; KEEP="$KEEP $1"; }
+    cur=$(node -v 2>/dev/null); [ -n "$cur" ] && keep_add "$cur"
     alias_default=$(cat "$H/.nvm/alias/default" 2>/dev/null)
     if [ -n "$alias_default" ]; then
       # resolve a bare major like "22" to the highest installed v22.*
       res=$(ls "$NVD" 2>/dev/null | grep "^v${alias_default#v}" | sed 's/^v//' \
             | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
-      [ -n "$res" ] && res="v$res"
-      [ -n "$res" ] && KEEP="$KEEP $res"
+      [ -n "$res" ] && keep_add "v$res"
     fi
     if [ "${#MR_NVM_KEEP[@]}" -gt 0 ]; then
-      for k in "${MR_NVM_KEEP[@]}"; do KEEP="$KEEP $k"; done
+      for k in "${MR_NVM_KEEP[@]}"; do keep_add "$k"; done
     fi
     info "keeping:$KEEP"
     for v in "$NVD"/*; do

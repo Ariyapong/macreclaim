@@ -17,7 +17,12 @@ ok()   { printf "  %s%s%s\n" "$C_G" "$1" "$C_0"; }
 warn() { printf "  %s%s%s\n" "$C_Y" "$1" "$C_0"; }
 err()  { printf "  %s%s%s\n" "$C_R" "$1" "$C_0"; }
 
-tilde()   { printf '%s' "${1/#$HOME/\~}"; }
+tilde() {  # bash 3.2 keeps the backslash in ${v/#p/\~}, so build it by hand
+  case "$1" in
+    "$HOME"/*) printf '~%s' "${1#"$HOME"}" ;;
+    *)         printf '%s' "$1" ;;
+  esac
+}
 size_mb() { du -sm "$1" 2>/dev/null | cut -f1; }
 gb()      { awk -v m="$1" 'BEGIN{printf "%.1f", m/1024}'; }
 
