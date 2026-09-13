@@ -13,6 +13,7 @@ macreclaim $VERSION — find and reclaim disk space on macOS
   macreclaim drill [paths...]  size the big unknowns         (~1 min)
   macreclaim clean [options]   tiered cleanup, DRY RUN by default
   macreclaim release           drop local snapshots so freed space appears
+  macreclaim diff [OLD NEW]    what changed between two scan reports
 
 Typical run:
 
@@ -39,6 +40,7 @@ case "$cmd" in
   drill)   exec bash "$DIR/scripts/drill.sh" "$@" ;;
   clean)   exec bash "$DIR/scripts/clean.sh" "$@" ;;
   release) exec bash "$DIR/scripts/release.sh" "$@" ;;
+  diff)    exec bash "$DIR/scripts/diff.sh" "$@" ;;
   -v|--version) echo "macreclaim $VERSION" ;;
   ""|-h|--help) usage ;;
   *) echo "unknown command: $cmd" >&2; echo >&2; usage >&2; exit 2 ;;

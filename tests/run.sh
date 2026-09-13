@@ -186,6 +186,59 @@ test_nvm_keeps_current_and_default() {
   assert_missing "$H/.nvm/versions/node/v18.0.0"
 }
 
+test_diff_reports_growth_shrink_new_and_gone() {
+  old="$T/old.txt"; new="$T/new.txt"
+  cat > "$old" <<EOF
+macreclaim scan — old
+=========== VOLUMES ===========
+Filesystem        Size    Used   Avail Capacity iused ifree %iused  Mounted on
+/dev/disk3s5     460Gi   305Gi   100Gi    72%    5.5M  1.3G    0%   /System/Volumes/Data
+=========== HOME TOP-LEVEL ===========
+ 10G	$H/Library
+2.0G	$H/.cache
+500M	$H/gone-dir
+=========== DEV CACHES ===========
+1.5G	$H/.cache/uv
+=========== node_modules >= 100MB ===========
+    300 MB  $H/work/a/node_modules
+=========== /Applications (size + last opened, oldest first) ===========
+     966 MB  2026-01-01    Chrome.app
+EOF
+  cat > "$new" <<EOF
+macreclaim scan — new
+=========== VOLUMES ===========
+Filesystem        Size    Used   Avail Capacity iused ifree %iused  Mounted on
+/dev/disk3s5     460Gi   270Gi   130Gi    72%    5.5M  1.3G    0%   /System/Volumes/Data
+=========== HOME TOP-LEVEL ===========
+ 14G	$H/Library
+1.9G	$H/.cache
+800M	$H/new-dir
+=========== DEV CACHES ===========
+ 40M	$H/.cache/uv
+=========== node_modules >= 100MB ===========
+    300 MB  $H/work/a/node_modules
+=========== /Applications (size + last opened, oldest first) ===========
+     100 MB  2026-01-01    Chrome.app
+EOF
+  ( HOME="$H" "$BASH" "$ROOT/macreclaim" diff "$old" "$new" ) > "$OUTLOG" 2>&1
+  RC=$?
+  assert_eq 0 "$RC" "exit code"
+  assert_grep "Avail.*100Gi.*130Gi" "$OUTLOG"
+  assert_grep "+4.0 GB.*~/Library" "$OUTLOG"
+  assert_grep "\-1.5 GB.*~/.cache/uv" "$OUTLOG"
+  assert_grep "gone.*~/gone-dir" "$OUTLOG"
+  assert_grep "new.*~/new-dir" "$OUTLOG"
+  assert_grep "\-866 MB.*Chrome.app" "$OUTLOG"
+  assert_nogrep "work/a/node_modules" "$OUTLOG"     # unchanged
+  assert_nogrep "~/.cache " "$OUTLOG"               # 2.0G -> 1.9G is inside du rounding
+}
+
+test_diff_needs_two_reports() {
+  ( cd "$T" && "$BASH" "$ROOT/macreclaim" diff ) > "$OUTLOG" 2>&1
+  RC=$?
+  assert_eq 1 "$RC" "exit code with no reports"
+}
+
 # ------------------------------------------------------------- runner
 filter="${1:-}"
 for t in $(declare -F | awk '{print $3}' | grep '^test_' | sort); do
