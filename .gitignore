@@ -1,0 +1,9 @@
+# Your machine's cleanup config — never commit this.
+# It encodes paths specific to one computer at one point in time.
+macreclaim.conf
+
+# Generated reports
+reports/
+*.txt
+
+.DS_Store

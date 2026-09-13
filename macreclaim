@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# macreclaim — find and reclaim disk space on macOS.
+set -u
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+VERSION="1.0.0"
+
+usage() {
+  cat <<EOF
+macreclaim $VERSION — find and reclaim disk space on macOS
+
+  macreclaim scan              full read-only audit          (3-10 min)
+  macreclaim drill [paths...]  size the big unknowns         (~1 min)
+  macreclaim clean [options]   tiered cleanup, DRY RUN by default
+  macreclaim release           drop local snapshots so freed space appears
+
+Typical run:
+
+  macreclaim scan                       # read the report
+  macreclaim drill                      # expand whatever looked big
+  cp macreclaim.conf.example macreclaim.conf
+  \$EDITOR macreclaim.conf               # fill in YOUR machine's paths
+  macreclaim clean --tiers a,b          # preview
+  macreclaim clean --tiers a,b --go     # execute
+  macreclaim release                    # THIS is what makes df move
+
+Run 'macreclaim clean --help' for cleanup options.
+
+Nothing is ever deleted without --go, and tiers d/e are empty until you
+list paths yourself.
+EOF
+}
+
+cmd="${1:-}"
+[ $# -gt 0 ] && shift
+
+case "$cmd" in
+  scan)    exec bash "$DIR/scripts/scan.sh" "$@" ;;
+  drill)   exec bash "$DIR/scripts/drill.sh" "$@" ;;
+  clean)   exec bash "$DIR/scripts/clean.sh" "$@" ;;
+  release) exec bash "$DIR/scripts/release.sh" "$@" ;;
+  -v|--version) echo "macreclaim $VERSION" ;;
+  ""|-h|--help) usage ;;
+  *) echo "unknown command: $cmd" >&2; echo >&2; usage >&2; exit 2 ;;
+esac

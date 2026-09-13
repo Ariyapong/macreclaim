@@ -1,0 +1,93 @@
+# macreclaim configuration
+#
+#   cp macreclaim.conf.example macreclaim.conf
+#
+# This file is sourced by bash. Every path here is YOUR machine's — fill it in
+# from your own `macreclaim scan` output, never from someone else's.
+#
+# Tiers a and b work with no config at all. Tiers c, d and e do nothing until
+# you list paths below. That is deliberate: a cleanup script that ships with
+# somebody else's delete list is a footgun.
+
+# ---------------------------------------------------------------------------
+# Apps to quit before deleting their caches (exact app names)
+# ---------------------------------------------------------------------------
+MR_QUIT_APPS=(
+  # "Visual Studio Code"
+  # "Notion"
+)
+
+# ---------------------------------------------------------------------------
+# TIER A / B additions — extra regenerable caches specific to your setup
+# ---------------------------------------------------------------------------
+MR_EXTRA_TIER_A=(
+  # "$HOME/projects/some-extension/.vscode-test"   # VS Code test harness
+  # "$HOME/.cache/some-tool"
+)
+
+MR_EXTRA_TIER_B=(
+  # "$HOME/.dotnet/sdk"
+)
+
+# ---------------------------------------------------------------------------
+# TIER C — node_modules
+# ---------------------------------------------------------------------------
+# Explicit paths get exact size accounting. Prefer these.
+MR_NODE_MODULES_PATHS=(
+  # "$HOME/work/some-old-project/node_modules"
+)
+
+# Or auto-discover: any git repo under these roots with no commit in
+# MR_STALE_DAYS. Check the candidate list in a dry run before using --go.
+MR_NODE_MODULES_ROOTS=(
+  # "$HOME/work"
+)
+MR_STALE_DAYS=30
+
+# ---------------------------------------------------------------------------
+# TIER B — extra Node versions to keep
+# ---------------------------------------------------------------------------
+# The current version and your nvm default alias are always kept automatically.
+MR_NVM_KEEP=(
+  # "v20.19.0"
+)
+
+# ---------------------------------------------------------------------------
+# TIER D — apps and their leftovers
+# ---------------------------------------------------------------------------
+# An unused tool usually sprawls across several locations. List them all.
+#
+# WARNING: Spotlight's "last opened" date is unreliable — it returns null for
+# plenty of apps that ARE used. Confirm before adding anything here.
+MR_APP_PATHS=(
+  # "/Applications/SomeTool.app"
+  # "$HOME/.sometool"
+  # "$HOME/Library/Application Support/SomeTool"
+  # "$HOME/Library/Caches/com.vendor.sometool"
+  # "$HOME/Library/Preferences/com.vendor.sometool.plist"
+)
+
+# ---------------------------------------------------------------------------
+# TIER E — Electron app caches
+# ---------------------------------------------------------------------------
+# Often the single largest items on a developer Mac. Deleting a Partitions
+# folder usually means signing into that app again and waiting for a re-sync.
+#
+# Find yours with:
+#   find ~/Library/Application\ Support -maxdepth 2 -type d -name Partitions
+MR_ELECTRON_PARTITIONS=(
+  # "$HOME/Library/Application Support/SomeApp/Partitions"
+)
+
+# ---------------------------------------------------------------------------
+# NEVER put these in any list above
+# ---------------------------------------------------------------------------
+#   ~/Library/Mail
+#   ~/Library/Messages
+#   ~/Library/Group Containers/*Office        (Outlook mail store)
+#   ~/Library/Group Containers/*line*         (LINE chat history)
+#   ~/Pictures/Photos Library.photoslibrary
+#   ~/Library/Application Support/MobileSync  (iOS device backups)
+#   any *.app you actually use
+#
+# These are multi-gigabyte and irreplaceable. They are data, not cache.
