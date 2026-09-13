@@ -15,11 +15,13 @@ OUT="$OUTDIR/scan-$(date +%Y%m%d-%H%M%S).txt"
 : "${MR_REPO_MB:=300}"
 
 echo "Scanning… this walks your whole home folder and takes 3-10 minutes."
-echo "Nothing is printed until it finishes. Writing to:"
+echo "Writing to:"
 echo "  $OUT"
 echo
 
+exec 3>&2            # keep the terminal for progress; everything else goes to the report
 exec > "$OUT" 2>&1
+step() { printf '  %s %s\n' "$(date +%H:%M:%S)" "$1" >&3; }
 export LC_ALL=C
 H="$HOME"
 FERR=$(mktemp -t macreclaim-find) || FERR=/dev/null
@@ -34,6 +36,7 @@ find_errs() {
 echo "macreclaim scan — $(date)"
 echo "host=$(hostname)  user=$USER  macOS=$(sw_vers -productVersion 2>/dev/null)"
 
+step "volumes, snapshots, home top-level"
 hdr "VOLUMES"
 df -h / /System/Volumes/Data 2>/dev/null
 echo
@@ -53,6 +56,7 @@ for d in "Library" "Library/Caches" "Library/Application Support" \
   du -xh -d 1 "$H/$d" 2>/dev/null | sort -hr | head -30
 done
 
+step "applications"
 hdr "/Applications (size)"
 du -xh -d 1 /Applications 2>/dev/null | sort -hr | head -60
 
@@ -65,6 +69,7 @@ for a in /Applications/*.app; do
   printf "%8s MB  %-12s  %s\n" "${s:-?}" "${d:0:10}" "$(basename "$a")"
 done | sort -k3,3
 
+step "dev caches, homebrew, containers"
 hdr "DEV CACHES"
 for p in "$H/.npm" "$H/.pnpm-store" "$H/Library/pnpm" "$H/.yarn" "$H/Library/Caches/Yarn" \
          "$H/.cache" "$H/.cache/uv" "$H/.cache/node/corepack" "$H/Library/Caches/pnpm" \
@@ -75,6 +80,11 @@ for p in "$H/.npm" "$H/.pnpm-store" "$H/Library/pnpm" "$H/.yarn" "$H/Library/Cac
          "$H/.docker" "$H/.colima" "$H/.orbstack" "$H/.lima" "$H/.podman" "$H/.vagrant.d" \
          "$H/Library/Caches/ms-playwright" "$H/Library/Caches/puppeteer" \
          "$H/Library/Caches/electron" "$H/Library/Caches/typescript" \
+         "$H/Library/Caches/go-build" "$H/go/pkg/mod" "$H/.bun/install/cache" \
+         "$H/Library/Caches/Cypress" "$H/.cache/huggingface" "$H/.ollama/models" \
+         "$H/Library/Caches/JetBrains" "$H/Library/Caches/Google/Chrome" \
+         "$H/Library/Developer/Xcode/iOS DeviceSupport" "$H/Library/Developer/CoreSimulator" \
+         "$H/Library/Application Support/Code/User/workspaceStorage" \
          "$H/.vscode/extensions" "$H/.vscode-insiders/extensions" "$H/.cursor/extensions" \
          "$H/.Trash"; do
   [ -e "$p" ] && du -sh "$p" 2>/dev/null
@@ -98,6 +108,7 @@ find "$H/Library/Application Support" -maxdepth 2 -type d -name Partitions 2>/de
   m=$(du -sm "$d" 2>/dev/null | cut -f1); [ "${m:-0}" -ge 200 ] && printf "%8s MB  %s\n" "$m" "$d"
 done | sort -nr
 
+step "node_modules (slow: walks your whole home folder)"
 hdr "node_modules >= ${MR_NODE_MODULES_MB}MB"
 find "$H" -maxdepth 7 -type d -name node_modules -prune 2>>"$FERR" | while read -r d; do
   m=$(du -sm "$d" 2>>"$FERR" | cut -f1)
@@ -105,6 +116,7 @@ find "$H" -maxdepth 7 -type d -name node_modules -prune 2>>"$FERR" | while read 
 done | sort -nr | head -40
 find_errs
 
+step "build and test dirs"
 hdr "BUILD / TEST DIRS >= ${MR_NODE_MODULES_MB}MB"
 find "$H" -maxdepth 7 -type d -name node_modules -prune -o -type d \( -name .next -o -name dist \
      -o -name build -o -name target -o -name venv -o -name .venv -o -name .turbo -o -name DerivedData \
@@ -114,6 +126,7 @@ find "$H" -maxdepth 7 -type d -name node_modules -prune -o -type d \( -name .nex
 done | sort -nr | head -40
 find_errs
 
+step "git repos"
 hdr "GIT REPOS >= ${MR_REPO_MB}MB (with last commit date)"
 find "$H" -maxdepth 6 -type d -name .git -prune 2>>"$FERR" | while read -r g; do
   r=$(dirname "$g")
@@ -125,11 +138,13 @@ find "$H" -maxdepth 6 -type d -name .git -prune 2>>"$FERR" | while read -r g; do
 done | sort
 find_errs
 
+step "large files (slow)"
 hdr "FILES >= ${MR_BIG_FILE_MB}MB IN HOME  (allocated size — sparse disk images show what they really use)"
 find "$H" -type f -size +$((MR_BIG_FILE_MB * 1000))k -exec du -sm {} + 2>>"$FERR" \
   | sort -nr | head -60 | awk -F'\t' '{printf "%8s MB  %s\n", $1, $2}'
 find_errs
 
+step "user folders, mail, photos"
 hdr "USER FOLDERS"
 for d in Downloads Desktop Documents Movies Pictures Music; do
   [ -d "$H/$d" ] || continue
@@ -146,3 +161,4 @@ du -sh "$H/Library/Group Containers/"*Office "$H/Library/Group Containers/"*line
 hdr "DONE"
 date
 [ "$FERR" != /dev/null ] && rm -f "$FERR"
+step "done — report: $OUT"
