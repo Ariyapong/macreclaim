@@ -3,6 +3,7 @@
 # Usage: macreclaim drill [extra/paths ...]
 set -u
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export NO_COLOR=1   # output goes to a file; colour must be decided before common.sh loads
 . "$DIR/lib/common.sh"
 mr_require_macos
 
@@ -56,7 +57,10 @@ du -xh -d 1 "$H/Library/pnpm/store" "$H/.pnpm-store" 2>/dev/null | sort -hr
 
 hdr "Homebrew"
 du -xh -d 1 /opt/homebrew 2>/dev/null | sort -hr | head -10
-brew cleanup -n 2>/dev/null | tail -3
+if command -v brew >/dev/null 2>&1; then
+  BC=$(brew cleanup -n 2>/dev/null | tail -3)
+  if [ -n "$BC" ]; then echo "$BC"; else echo "brew cleanup -n: nothing to remove"; fi
+fi
 
 hdr "VS Code family — cache vs. real data"
 for v in "Code" "Code - Insiders" "VSCodium" "Cursor"; do

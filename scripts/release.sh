@@ -48,10 +48,21 @@ fi
 hdr "DELETED FILES STILL HELD OPEN"
 info "Space stays locked until these processes exit. A reboot clears all of them."
 info "Ignore LaunchServices / .csstore entries — macOS rotates those constantly."
-sudo lsof -nP +L1 2>/dev/null \
-  | grep -v -e '\.csstore' -e 'LaunchServices' \
-  | awk 'NR>1 && $7+0 > 10485760 {printf "  %-20s %8.1f MB  %s\n", $1, $7/1048576, $NF}' \
-  | sort -k2 -nr | head -15
+# -F field output instead of columns: NAMEs with spaces survive, a missing SIZE
+# can't shift fields, and +c 0 stops lsof truncating COMMAND to 9 chars.
+# One line per (command, file); "(xN)" = how many descriptors/processes hold it.
+sudo lsof -nP +c 0 +L1 -F csn 2>/dev/null \
+  | awk '
+      /^c/ { cmd = substr($0, 2) }
+      /^f/ { size = 0 }
+      /^s/ { size = substr($0, 2) + 0 }
+      /^n/ { name = substr($0, 2)
+             if (size > 10485760 && name !~ /\.csstore/ && name !~ /LaunchServices/)
+               printf "%s\t%s\t%s\n", size, cmd, name
+             size = 0 }' \
+  | sort | uniq -c | sort -k2,2nr | head -15 \
+  | awk '{ n = $1; sub(/^ *[0-9]+ /, ""); split($0, a, "\t")
+           printf "  %-24s %8.1f MB  %s%s\n", a[2], a[1]/1048576, a[3], (n > 1 ? "  (x" n ")" : "") }'
 echo "  (only entries over 10 MB shown)"
 
 hdr "SPACE AFTER"

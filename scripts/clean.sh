@@ -83,6 +83,7 @@ if has_tier a; then
   mr_zap "$H/.yarn/berry/cache"
   mr_zap "$H/Library/Caches/pip"
   mr_zap "$H/.cache/pip"
+  mr_zap "$H/.cache/uv"                  # uv's download/archive cache; venvs keep their own copies
   mr_zap "$H/Library/Caches/electron"
   mr_zap "$H/Library/Caches/typescript"
   mr_zap "$H/Library/Application Support/Google/GoogleUpdater/crx_cache"
